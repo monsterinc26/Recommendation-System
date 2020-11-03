@@ -1,0 +1,77 @@
+df=pd.read_csv('D:/python/Datasets/tmdb_5000_credits.csv')
+df1=pd.read_csv('D:/python/Datasets/tmdb_5000_movies.csv')
+
+df.columns=['id','title','cast','crew']
+df1=df1.merge(df,on='id')
+
+
+from ast import literal_eval
+
+features = ['cast', 'crew', 'keywords', 'genres']
+for feature in features:
+    df1[feature] = df1[feature].apply(literal_eval)
+
+import numpy as np
+def get_director(x):
+    for i in x:
+        if i['job']=='Director':
+            return i['name']
+    return np.nan
+    
+df1['director']=df1['crew'].apply(get_director)
+
+def get_names(x):
+    if isinstance(x, list):
+        names=[i['name'] for i in x]
+        return names
+    return []
+
+features=['cast','keywords','genres']
+for i in features:
+    df1[i]=df1[i].apply(get_names)
+
+def clean_data(x):
+    if isinstance(x, list):
+        return [str.lower(i.replace(" ","")) for i in x]
+    else:
+        if isinstance(x, str):
+            return str.lower(x.replace(" ",""))
+        else:
+            return ""
+        
+features=['cast','keywords','genres','director']
+for i in features:
+    df1[i]=df1[i].apply(clean_data)
+
+def combined(x):
+    return " ".join(x['cast'])+" "+" ".join(x['keywords'])+" "+" ".join( x['genres'])+" "+" ".join(x['director'])
+df1['combined']=df1.apply(combined,axis=1)
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+cv=TfidfVectorizer()
+arr=cv.fit_transform(df1['combined'])
+
+from sklearn.metrics.pairwise import cosine_similarity
+cs=cosine_similarity(arr)
+
+df1=df1.reset_index()
+
+def get_movie_index(name):
+    return df1[df1['original_title']==name]['index'].values[0]
+def get_index_title(index):
+    return df1[df1['index']==index]['original_title'].values[0]
+
+movie_name=input('Enter movie name ')
+indexx=get_movie_index(movie_name)
+similar_movies=list(enumerate(cs[indexx]))
+print(similar_movies)
+sorted_movies=sorted(similar_movies,key=lambda x:x[1],reverse=True)
+print(sorted_movies)
+
+i=0
+for j in sorted_movies:
+    print(get_index_title(j[0]))
+    i+=1
+    if i > 10:
+        break
